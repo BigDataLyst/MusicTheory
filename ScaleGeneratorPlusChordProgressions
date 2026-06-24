@@ -1,0 +1,71 @@
+def create_scale(root_note: str, scale_type: str = "major") -> list[str]:
+    pitch_map = {
+        'C': 0, 'B#': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 
+        'E': 4, 'Fb': 4, 'F': 5, 'E#': 5, 'F#': 6, 'Gb': 6, 'G': 7, 
+        'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11, 'Cb': 11
+    }
+    letters = ['C', 'D', 'E', 'F', 'G', 'A', 'B']
+    patterns = {
+        "major": [2, 2, 1, 2, 2, 2, 1],
+        "minor": [2, 1, 2, 2, 1, 2, 2]
+    }
+    
+    root = root_note.strip().capitalize()
+    scale_type = scale_type.strip().lower()
+    
+    if root not in pitch_map:
+        raise ValueError(f"Unsupported root note: {root_note}")
+        
+    current_pitch = pitch_map[root]
+    target_pitches = [current_pitch]
+    for step in patterns[scale_type]:
+        current_pitch = (current_pitch + step) % 12
+        target_pitches.append(current_pitch)
+        
+    # FIX: Isolate the raw base letter (e.g., 'F' from 'Fb')
+    root_letter = root[0]
+    start_letter_idx = letters.index(root_letter)
+    scale_letters = [letters[(start_letter_idx + i) % 7] for i in range(8)]
+    
+    scale = []
+    for letter, target in zip(scale_letters, target_pitches):
+        base_pitch = pitch_map[letter]
+        diff = (target - base_pitch) % 12
+        if diff > 5: 
+            diff -= 12
+        accidental = "" if diff == 0 else ("#" * diff if diff > 0 else "b" * abs(diff))
+        scale.append(f"{letter}{accidental}")
+        
+    return scale
+
+def generate_chord_progression(root_note: str, scale_type: str = "major") -> None:
+    scale = create_scale(root_note, scale_type)
+    roman_numerals = {
+        "major": ["I", "ii", "iii", "IV", "V", "vi", "vii°"],
+        "minor": ["i", "ii°", "III", "iv", "v", "VI", "VII"]
+    }
+    
+    print(f"\n=== Triad Chords for {root_note} {scale_type.capitalize()} ===")
+    for i in range(7):
+        root = scale[i]
+        third = scale[(i + 2) % 7]
+        fifth = scale[(i + 4) % 7]
+        numeral = roman_numerals[scale_type.lower()][i]
+        print(f"Degree {i+1} ({numeral}): {root} triad -> {[root, third, fifth]}")
+
+# --- Test Runs ---
+print("D Major:", create_scale("D", "major"))
+# Outputs ['D', 'E', 'F#', 'G', 'A', 'B', 'C#', 'D']
+generate_chord_progression("D", "major")
+
+print("Fb Minor:", create_scale("Fb", "minor"))
+# Outputs ['Fb', 'Gb', 'Abb', 'Bbb', 'Cb', 'Dbb', 'Ebb', 'Fb']
+generate_chord_progression("Fb", "minor")
+
+print("C Major:", create_scale("C", "major"))
+# Outputs: ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C']
+generate_chord_progression("C", "major")
+
+print("A Minor:", create_scale("A", "minor"))
+# Outputs: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'A']
+generate_chord_progression("A", "minor")
