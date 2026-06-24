@@ -1,0 +1,99 @@
+##pip install midiutil
+from midiutil import MIDIFile
+
+def create_scale(root_note: str, scale_type: str = "major") -> list[str]:
+    pitch_map = {
+        'C': 0, 'B#': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 
+        'E': 4, 'Fb': 4, 'F': 5, 'E#': 5, 'F#': 6, 'Gb': 6, 'G': 7, 
+        'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11, 'Cb': 11
+    }
+    letters = ['C', 'D', 'E', 'F', 'G', 'A', 'B']
+    patterns = {
+        "major": [2, 2, 1, 2, 2, 2, 1],
+        "minor": [2, 1, 2, 2, 1, 2, 2]
+    }
+    
+    root = root_note.strip().capitalize()
+    scale_type = scale_type.strip().lower()
+    
+    current_pitch = pitch_map[root]
+    target_pitches = [current_pitch]
+    for step in patterns[scale_type]:
+        current_pitch = (current_pitch + step) % 12
+        target_pitches.append(current_pitch)
+        
+    root_letter = root[0]
+    start_letter_idx = letters.index(root_letter)
+    scale_letters = [letters[(start_letter_idx + i) % 7] for i in range(8)]
+    
+    scale = []
+    for letter, target in zip(scale_letters, target_pitches):
+        base_pitch = pitch_map[letter]
+        diff = (target - base_pitch) % 12
+        if diff > 5: 
+            diff -= 12
+        accidental = "" if diff == 0 else ("#" * diff if diff > 0 else "b" * abs(diff))
+        scale.append(f"{letter}{accidental}")
+        
+    return scale, target_pitches
+
+def note_name_to_midi(note_name: str, target_pitch: int, base_octave: int = 4) -> int:
+    """Converts a spelled note name and pitch index to an absolute MIDI number."""
+    # MIDI index 60 is Middle C (C4)
+    # Pitch index tells us the offset within the octave (0 to 11)
+    midi_note = (base_octave + 1) * 12 + target_pitch
+    return midi_note
+
+def export_scale_chords_to_midi(root_note: str, scale_type: str = "major", filename: str = "output.mid") -> None:
+    # 1. Generate spelled notes and their pitch map indexes (0-11)
+    scale_notes, pitch_indices = create_scale(root_note, scale_type)
+    
+    # 2. Convert scale notes to concrete MIDI values in Octave 4
+    midi_scale = []
+    for note, pitch in zip(scale_notes, pitch_indices):
+        midi_num = note_name_to_midi(note, pitch, base_octave=4)
+        midi_scale.append(midi_num)
+    
+    # 3. Initialize MIDI File (1 track, 120 BPM)
+    midi = MIDIFile(1)  
+    track = 0
+    time = 0  # Starts at beat 0
+    midi.addTrackName(track, time, f"{root_note} {scale_type.capitalize()} Progression")
+    midi.addTempo(track, time, 120)
+    
+    channel = 0
+    volume = 100    # Velocity (0-127)
+    duration = 2    # Each chord lasts for 2 beats (Half note)
+    
+    print(f"Writing MIDI file '{filename}'...")
+    
+    # 4. Generate and write the 7 chords sequentially
+    for i in range(7):
+        # Extract triad notes from the MIDI sequence
+        root = midi_scale[i]
+        third = midi_scale[(i + 2) % 7]
+        fifth = midi_scale[(i + 4) % 7]
+        
+        # Correct octave jumps if the 3rd or 5th wrapped around backward 
+        if third < root: third += 12
+        if fifth < third: fifth += 12
+        
+        chord = [root, third, fifth]
+        
+        # Write the 3 notes of the chord simultaneously at the current time
+        for midi_note in chord:
+            midi.addNote(track, channel, midi_note, time, duration, volume)
+            
+        print(f" Beat {time}: Played triad {scale_notes[i]}, {scale_notes[(i+2)%7]}, {scale_notes[(i+4)%7]} (MIDI: {chord})")
+        
+        # Move time forward for the next chord
+        time += duration 
+
+    # 5. Save the file to disk
+    with open(filename, "wb") as output_file:
+        midi.writeFile(output_file)
+    print("MIDI export complete successfully!")
+
+# --- Test Execution ---
+export_scale_chords_to_midi("D", "major", "D_Major_Chords.mid")
+export_scale_chords_to_midi("Fb", "minor", "Fb_Minor_Chords.mid")
